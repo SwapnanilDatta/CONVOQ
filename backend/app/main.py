@@ -27,7 +27,7 @@ async def upload_chat(file: UploadFile = File(...)):
 
     return {
         "total_messages": len(messages),
-        "messages": messages[:50]  # limit for now
+        "messages": messages[:50] 
     }
 
 @app.post("/analyze/reply-time")

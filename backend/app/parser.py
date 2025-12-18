@@ -2,8 +2,9 @@ import re
 from typing import List
 from app.schema import ChatMessage
 
-# Example WhatsApp line:
+
 # 12/01/24, 10:41 pm - John: hello bro
+# mm/dd/yy, hh:mm am/pm - Sender: message
 
 pattern = re.compile(
     r"(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}\s?[ap]m)\s-\s([^:]+):\s(.*)"
