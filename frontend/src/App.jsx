@@ -1,41 +1,47 @@
-import { useState } from "react"
+import { useState } from "react";
+import { uploadChatFile, analyzeReplyTime } from "./api/chatApi";
+import FileUpload from "./components/FileUpload";
 
 function App() {
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleUpload = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
+  const handleFileAction = async (file) => {
+    if (!file) return;
+    setLoading(true);
 
-    const formData = new FormData()
-    formData.append("file", file)
+    try {
+      // Run both calls
+      const uploadData = await uploadChatFile(file);
+      setResult(uploadData);
 
-    const res = await fetch("http://127.0.0.1:8000/upload", {
-      method: "POST",
-      body: formData
-    })
-
-    const data = await res.json()
-    setResult(data)
-  }
+      const replyData = await analyzeReplyTime(file);
+      console.log("Reply Analysis:", replyData);
+    } catch (error) {
+      console.error("Upload failed:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div style={{ padding: "20px" }}>
       <h1>CONVOQ</h1>
+      
+      <FileUpload onUpload={handleFileAction} />
 
-      <input type="file" accept=".txt" onChange={handleUpload} />
+      {loading && <p>Processing chat...</p>}
 
       {result && (
-        <>
+        <div style={{ marginTop: "20px" }}>
           <h3>Total Messages: {result.total_messages}</h3>
-
-          <pre style={{ maxHeight: "300px", overflow: "auto" }}>
+          <pre style={{ maxHeight: "300px", overflow: "auto", background: "#ff0000ff" }}>
             {JSON.stringify(result.messages, null, 2)}
           </pre>
-        </>
+        </div>
       )}
     </div>
-  )
+  );
 }
 
-export default App
+export default App;

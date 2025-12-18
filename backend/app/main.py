@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from app.parser import parse_chat
 from app.schema import UploadResponse
-
+from app.analysis import reply_time_analysis
 app = FastAPI(title="CONVOQ API")
 
 # CORS (VERY IMPORTANT for React)
@@ -29,3 +29,11 @@ async def upload_chat(file: UploadFile = File(...)):
         "total_messages": len(messages),
         "messages": messages[:50]  # limit for now
     }
+
+@app.post("/analyze/reply-time")
+async def analyze_reply_time(file: UploadFile = File(...)):
+    content = await file.read()
+    messages = parse_chat(content.decode("utf-8"))
+
+    result = reply_time_analysis(messages)
+    return result
