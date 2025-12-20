@@ -21,3 +21,14 @@ export const analyzeReplyTime = async (file) => {
   });
   return response.json();
 };
+
+export const analyzeSentiment = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${BASE_URL}/analyze/sentiment`, {
+    method: "POST",
+    body: formData,
+  });
+  return response.json();
+};

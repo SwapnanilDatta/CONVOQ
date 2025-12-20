@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { uploadChatFile, analyzeReplyTime } from "./api/chatApi";
+import { uploadChatFile, analyzeReplyTime, analyzeSentiment } from "./api/chatApi";
 import FileUpload from "./components/FileUpload";
+import SentimentAnalyzer from "./components/SentimentAnalysis";
 
 function App() {
-  const [result, setResult] = useState(null);
+  const [chatData, setChatData] = useState(null);
+  const [sentimentData, setSentimentData] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const handleFileAction = async (file) => {
@@ -11,14 +13,18 @@ function App() {
     setLoading(true);
 
     try {
-      // Run both calls
-      const uploadData = await uploadChatFile(file);
-      setResult(uploadData);
+      const [uploadRes, replyRes, sentimentRes] = await Promise.all([
+        uploadChatFile(file),
+        analyzeReplyTime(file),
+        analyzeSentiment(file)
+      ]);
 
-      const replyData = await analyzeReplyTime(file);
-      console.log("Reply Analysis:", replyData);
+      setChatData(uploadRes);
+      setSentimentData(sentimentRes.timeline || []);
+      
+      console.log("Reply Analysis:", replyRes);
     } catch (error) {
-      console.error("Upload failed:", error);
+      console.error("Processing failed:", error);
     } finally {
       setLoading(false);
     }
@@ -30,16 +36,26 @@ function App() {
       
       <FileUpload onUpload={handleFileAction} />
 
-      {loading && <p>Processing chat...</p>}
+      {loading && <p>Processing everything...</p>}
 
-      {result && (
-        <div style={{ marginTop: "20px" }}>
-          <h3>Total Messages: {result.total_messages}</h3>
-          <pre style={{ maxHeight: "300px", overflow: "auto", background: "#ff0000ff" }}>
-            {JSON.stringify(result.messages, null, 2)}
-          </pre>
-        </div>
-      )}
+      <div style={{ display: "flex", gap: "20px", marginTop: "20px" }}>
+     
+        {chatData && (
+          <div style={{ flex: 1 }}>
+            <h3>Total Messages: {chatData.total_messages}</h3>
+            <pre style={{ maxHeight: "400px", overflow: "auto", background: "#f40000ff", padding: "10px" }}>
+              {JSON.stringify(chatData.messages, null, 2)}
+            </pre>
+          </div>
+        )}
+
+        
+        {sentimentData.length > 0 && (
+          <div style={{ flex: 1 }}>
+            <SentimentAnalyzer timeline={sentimentData} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
