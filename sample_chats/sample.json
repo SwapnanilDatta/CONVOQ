@@ -1,0 +1,95 @@
+{
+    "total_messages": 18,
+    "messages": [
+        {
+            "timestamp": "12/01/21 9:10 PM",
+            "sender": "Alice",
+            "message": "hey"
+        },
+        {
+            "timestamp": "12/01/21 11:45 PM",
+            "sender": "Bob",
+            "message": "what"
+        },
+        {
+            "timestamp": "12/01/21 11:46 PM",
+            "sender": "Alice",
+            "message": "why are you replying like this"
+        },
+        {
+            "timestamp": "12/01/21 11:50 PM",
+            "sender": "Bob",
+            "message": "im busy"
+        },
+        {
+            "timestamp": "12/02/21 10:05 AM",
+            "sender": "Alice",
+            "message": "good morning"
+        },
+        {
+            "timestamp": "12/02/21 3:40 PM",
+            "sender": "Bob",
+            "message": "👍"
+        },
+        {
+            "timestamp": "12/02/21 3:42 PM",
+            "sender": "Alice",
+            "message": "did I do something wrong?"
+        },
+        {
+            "timestamp": "12/02/21 8:15 PM",
+            "sender": "Bob",
+            "message": "stop overthinking"
+        },
+        {
+            "timestamp": "12/03/21 9:00 AM",
+            "sender": "Alice",
+            "message": "you didn’t reply last night"
+        },
+        {
+            "timestamp": "12/03/21 6:30 PM",
+            "sender": "Bob",
+            "message": "yeah so?"
+        },
+        {
+            "timestamp": "12/03/21 6:31 PM",
+            "sender": "Alice",
+            "message": "that hurt honestly"
+        },
+        {
+            "timestamp": "12/03/21 6:40 PM",
+            "sender": "Bob",
+            "message": "you’re being dramatic"
+        },
+        {
+            "timestamp": "12/04/21 8:00 AM",
+            "sender": "Alice",
+            "message": "can we talk today"
+        },
+        {
+            "timestamp": "12/04/21 11:59 PM",
+            "sender": "Bob",
+            "message": "tired"
+        },
+        {
+            "timestamp": "12/05/21 9:30 AM",
+            "sender": "Alice",
+            "message": "I feel ignored"
+        },
+        {
+            "timestamp": "12/06/21 2:00 PM",
+            "sender": "Bob",
+            "message": "ok"
+        },
+        {
+            "timestamp": "12/07/21 10:00 AM",
+            "sender": "Alice",
+            "message": "are we even okay?"
+        },
+        {
+            "timestamp": "12/08/21 7:45 PM",
+            "sender": "Bob",
+            "message": "idk"
+        }
+    ]
+}

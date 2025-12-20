@@ -1,35 +1,73 @@
 from datetime import datetime
 from collections import defaultdict
+from typing import List
+from app.schema import Message
 
-def reply_time_analysis(messages):
-    sender_times = defaultdict(list)
-    prev_sender = None
-    prev_time = None
-
-    for msg in messages:
+def parse_timestamp(timestamp: str) -> datetime:
+    """Parse timestamp with multiple format support"""
+    formats = [
+        "%m/%d/%y %I:%M %p",
+        "%d/%m/%y %I:%M %p",
+        "%m/%d/%Y %I:%M %p",
+        "%d/%m/%Y %I:%M %p",
+        "%m/%d/%y %I:%M:%S %p",
+        "%d/%m/%y %I:%M:%S %p",
+    ]
+    
+    timestamp = timestamp.replace("am", "AM").replace("pm", "PM")
+    
+    for fmt in formats:
         try:
-            current_time = datetime.strptime(
-                msg.timestamp.replace("pm", "PM").replace("am", "AM"),
-                "%m/%d/%y %I:%M %p" 
-            )
-        except Exception as e:
-            
-            print(f"Error parsing: {msg.timestamp} -> {e}")
+            return datetime.strptime(timestamp, fmt)
+        except ValueError:
             continue
+    
+    raise ValueError(f"Unable to parse timestamp: {timestamp}")
 
-        if prev_sender and msg.sender != prev_sender:
-            diff = (current_time - prev_time).total_seconds() / 60
-           
-            if diff >= 0:
-                sender_times[msg.sender].append(diff)
-
-        prev_sender = msg.sender
-        prev_time = current_time
-
-    avg_reply = {
-        sender: round(sum(times) / len(times), 2)
-        for sender, times in sender_times.items()
-        if times
+def reply_time_analysis(messages: List[Message]):
+    """Analyze reply times between senders"""
+    reply_times = defaultdict(list)
+    
+    for i in range(1, len(messages)):
+        current_msg = messages[i]
+        prev_msg = messages[i-1]
+        
+        if current_msg.sender != prev_msg.sender:
+            try:
+                current_time = parse_timestamp(current_msg.timestamp)
+                prev_time = parse_timestamp(prev_msg.timestamp)
+                
+                time_diff = (current_time - prev_time).total_seconds() / 60
+                
+                if time_diff > 0:
+                    reply_times[current_msg.sender].append({
+                        "minutes": round(time_diff, 2),
+                        "timestamp": current_msg.timestamp
+                    })
+            except:
+                continue
+    
+    avg_reply_time = {}
+    for sender, times in reply_times.items():
+        if times:
+            avg_minutes = sum(t["minutes"] for t in times) / len(times)
+            avg_reply_time[sender] = round(avg_minutes, 2)
+    
+    all_replies = []
+    for sender, times in reply_times.items():
+        for t in times:
+            all_replies.append({
+                "sender": sender,
+                "minutes": t["minutes"],
+                "timestamp": t["timestamp"]
+            })
+    
+    fastest = min(all_replies, key=lambda x: x["minutes"]) if all_replies else None
+    slowest = max(all_replies, key=lambda x: x["minutes"]) if all_replies else None
+    
+    return {
+        "avg_reply_time": avg_reply_time,
+        "fastest_reply": fastest,
+        "slowest_reply": slowest,
+        "total_replies_analyzed": len(all_replies)
     }
-
-    return avg_reply

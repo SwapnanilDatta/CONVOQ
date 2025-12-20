@@ -1,11 +1,11 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict, Optional
 
-class ChatMessage(BaseModel):
+class Message(BaseModel):
     timestamp: str
     sender: str
     message: str
 
 class UploadResponse(BaseModel):
     total_messages: int
-    messages: List[ChatMessage]
+    messages: List[Message]

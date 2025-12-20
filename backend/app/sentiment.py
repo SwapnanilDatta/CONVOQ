@@ -24,10 +24,20 @@ def sentiment_timeline(sentiment_data):
 
     for item in sentiment_data:
         try:
-            # assuming format: "12/01/24 10:41 pm"
-            date_str = item["timestamp"].split(" ")[0]
-            date = datetime.strptime(date_str, "%d/%m/%y").date()
-            daily[date].append(item["sentiment"])
+            timestamp = item["timestamp"]
+            date_str = timestamp.split(" ")[0]
+            
+            # Try both MM/DD/YY and DD/MM/YY formats
+            date = None
+            for fmt in ["%m/%d/%y", "%d/%m/%y"]:
+                try:
+                    date = datetime.strptime(date_str, fmt).date()
+                    break
+                except ValueError:
+                    continue
+            
+            if date:
+                daily[date].append(item["sentiment"])
         except:
             continue
 
@@ -38,6 +48,5 @@ def sentiment_timeline(sentiment_data):
             "avg_sentiment": round(sum(scores) / len(scores), 3)
         })
 
-    # sort by date
     timeline.sort(key=lambda x: x["date"])
     return timeline
