@@ -8,6 +8,8 @@ from app.initiation_analysis import initiation_analysis
 from app.health_score import compute_health_score
 from typing import List
 from collections import defaultdict
+from app.toxicity import detect_toxicity
+
 #from app.coach import generate_relationship_narrative
 from app.cluster import ConversationClassifier
 classifier = ConversationClassifier()
@@ -143,6 +145,7 @@ async def complete_analysis(file: UploadFile = File(...)):
         
         # Run all analyses
         reply_analysis = reply_time_analysis(messages)
+        toxicity_data = detect_toxicity(messages)
         sentiment_data = analyze_sentiment(messages)
         timeline = sentiment_timeline(sentiment_data)
         initiations = initiation_analysis(messages, gap_hours=6)
@@ -159,6 +162,7 @@ async def complete_analysis(file: UploadFile = File(...)):
         return {
             "total_messages": len(messages),
             "participants": list(set(msg.sender for msg in messages)),
+            "toxicity": toxicity_data,
             "health_score": health_score,
             "persona_tag": persona, 
             "features": features,

@@ -27,47 +27,55 @@ def parse_timestamp(timestamp: str) -> datetime:
 def reply_time_analysis(messages: List[Message]):
     """Analyze reply times between senders"""
     reply_times = defaultdict(list)
+    all_gaps = []
     
     for i in range(1, len(messages)):
         current_msg = messages[i]
         prev_msg = messages[i-1]
         
-        if current_msg.sender != prev_msg.sender:
-            try:
-                current_time = parse_timestamp(current_msg.timestamp)
-                prev_time = parse_timestamp(prev_msg.timestamp)
+        try:
+            current_time = parse_timestamp(current_msg.timestamp)
+            prev_time = parse_timestamp(prev_msg.timestamp)
+            time_diff = (current_time - prev_time).total_seconds() / 60
+            
+            if time_diff > 0:
+                gap_data = {
+                    "minutes": round(time_diff, 2),
+                    "timestamp": current_msg.timestamp,
+                    "from": prev_msg.sender,
+                    "to": current_msg.sender
+                }
+                all_gaps.append(gap_data)
                 
-                time_diff = (current_time - prev_time).total_seconds() / 60
-                
-                if time_diff > 0:
-                    reply_times[current_msg.sender].append({
-                        "minutes": round(time_diff, 2),
-                        "timestamp": current_msg.timestamp
-                    })
-            except:
-                continue
-    
+                if current_msg.sender != prev_msg.sender:
+                    reply_times[current_msg.sender].append(gap_data)
+        except:
+            continue
     avg_reply_time = {}
     for sender, times in reply_times.items():
         if times:
             avg_minutes = sum(t["minutes"] for t in times) / len(times)
             avg_reply_time[sender] = round(avg_minutes, 2)
     
-    all_replies = []
-    for sender, times in reply_times.items():
-        for t in times:
-            all_replies.append({
-                "sender": sender,
-                "minutes": t["minutes"],
-                "timestamp": t["timestamp"]
-            })
+    # Find longest ghosting period
+    longest_ghost = max(all_gaps, key=lambda x: x["minutes"]) if all_gaps else None
     
-    fastest = min(all_replies, key=lambda x: x["minutes"]) if all_replies else None
-    slowest = max(all_replies, key=lambda x: x["minutes"]) if all_replies else None
+    # Peak conversation hours
+    hours_count = defaultdict(int)
+    for i, msg in enumerate(messages):
+        try:
+            dt = parse_timestamp(msg.timestamp)
+            hours_count[dt.hour] += 1
+        except:
+            continue
+    
+    peak_hours = sorted(hours_count.items(), key=lambda x: x[1], reverse=True)[:3]
     
     return {
         "avg_reply_time": avg_reply_time,
-        "fastest_reply": fastest,
-        "slowest_reply": slowest,
-        "total_replies_analyzed": len(all_replies)
+        "fastest_reply": min(all_gaps, key=lambda x: x["minutes"]) if all_gaps else None,
+        "slowest_reply": max(all_gaps, key=lambda x: x["minutes"]) if all_gaps else None,
+        "longest_ghosting": longest_ghost,
+        "peak_hours": [{"hour": h, "count": c} for h, c in peak_hours],
+        "total_replies_analyzed": len(all_gaps)
     }
