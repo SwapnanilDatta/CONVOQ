@@ -1,7 +1,7 @@
 from datetime import datetime
 from collections import defaultdict
 from typing import List
-from app.schema import Message
+from app.models.schema import Message
 
 def parse_timestamp(timestamp: str) -> datetime:
     """Parse timestamp with multiple format support"""

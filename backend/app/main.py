@@ -1,17 +1,16 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from app.parser import parse_chat
-from app.schema import UploadResponse, Message
-from app.sentiment import analyze_sentiment, sentiment_timeline
-from app.analysis import reply_time_analysis
-from app.initiation_analysis import initiation_analysis
-from app.health_score import compute_health_score
+from app.services.parser import parse_chat
+from app.models.schema import UploadResponse, Message
+from app.services.sentiment import analyze_sentiment, sentiment_timeline
+from app.services.analysis import reply_time_analysis
+from app.services.initiation_analysis import initiation_analysis
+from app.services.health_score import compute_health_score
 from typing import List
 from collections import defaultdict
-from app.toxicity import detect_toxicity
+from app.services.toxicity import detect_toxicity
 
-#from app.coach import generate_relationship_narrative
-from app.cluster import ConversationClassifier
+from app.services.cluster import ConversationClassifier
 classifier = ConversationClassifier()
 app = FastAPI(
     title="CONVOQ API",

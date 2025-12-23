@@ -1,6 +1,6 @@
 import requests
 from typing import List
-from app.schema import Message
+from app.models.schema import Message
 from dotenv import load_dotenv
 import os
 load_dotenv()

@@ -1,11 +1,7 @@
-"""
-WhatsApp Chat Parser
-Save this as: app/parser.py
-"""
 import re
 from datetime import datetime
 from typing import List
-from app.schema import Message
+from app.models.schema import Message
 
 def parse_chat(text: str) -> List[Message]:
     """Parse WhatsApp chat export text into structured messages"""
