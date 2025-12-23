@@ -1,42 +1,100 @@
-#root {
+.app {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #faf5ff 0%, #fce7f3 50%, #cffafe 100%);
+}
+
+.app-container {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 2rem 1rem;
+}
+
+.app-header {
   text-align: center;
+  margin-bottom: 3rem;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.app-title {
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  background: linear-gradient(to right, #9333ea, #db2777);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
+.app-subtitle {
+  color: #6b7280;
+  font-size: 1.125rem;
+}
+
+.loading-container {
+  text-align: center;
+  padding: 5rem 0;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 4rem;
+  height: 4rem;
+  border: 4px solid #e5e7eb;
+  border-top-color: #9333ea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+.loading-text {
+  font-size: 1.25rem;
+  color: #374151;
+  font-weight: 500;
+}
+
+.results-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.reset-button-container {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.reset-button {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(to right, #9333ea, #db2777);
+  color: white;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.reset-button:hover {
+  background: linear-gradient(to right, #7e22ce, #be185d);
+}
+
+.grid-2col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+  gap: 2rem;
+}
+
+@media (max-width: 768px) {
+  .app-title {
+    font-size: 2rem;
   }
-}
 
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+  .grid-2col {
+    grid-template-columns: 1fr;
+  }
 }

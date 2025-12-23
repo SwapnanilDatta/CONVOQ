@@ -45,10 +45,7 @@ def ping():
 
 @app.post("/upload", response_model=UploadResponse)
 async def upload_chat(file: UploadFile = File(...)):
-    """
-    Upload and parse WhatsApp chat file
-    Frontend should send multipart/form-data with file field
-    """
+
     try:
         content = await file.read()
         text = content.decode("utf-8")
@@ -65,74 +62,74 @@ async def upload_chat(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=f"Error parsing file: {str(e)}")
 
 
-@app.post("/analyze/reply-time")
-async def analyze_reply_time_endpoint(file: UploadFile = File(...)):
-    """
-    Analyze reply times between conversation participants
-    Returns average reply times, fastest and slowest replies
-    """
-    try:
-        content = await file.read()
-        messages = parse_chat(content.decode("utf-8"))
+# @app.post("/analyze/reply-time")
+# async def analyze_reply_time_endpoint(file: UploadFile = File(...)):
+#     """
+#     Analyze reply times between conversation participants
+#     Returns average reply times, fastest and slowest replies
+#     """
+#     try:
+#         content = await file.read()
+#         messages = parse_chat(content.decode("utf-8"))
         
-        if len(messages) < 2:
-            raise HTTPException(status_code=400, detail="Need at least 2 messages for analysis")
+#         if len(messages) < 2:
+#             raise HTTPException(status_code=400, detail="Need at least 2 messages for analysis")
         
-        result = reply_time_analysis(messages)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error analyzing reply times: {str(e)}")
+#         result = reply_time_analysis(messages)
+#         return result
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=f"Error analyzing reply times: {str(e)}")
 
 
-@app.post("/analyze/sentiment")
-async def sentiment_analysis_endpoint(file: UploadFile = File(...)):
-    """
-    Analyze sentiment of conversation over time
-    Returns daily sentiment trends
-    """
-    try:
-        content = await file.read()
-        messages = parse_chat(content.decode("utf-8"))
+# @app.post("/analyze/sentiment")
+# async def sentiment_analysis_endpoint(file: UploadFile = File(...)):
+#     """
+#     Analyze sentiment of conversation over time
+#     Returns daily sentiment trends
+#     """
+#     try:
+#         content = await file.read()
+#         messages = parse_chat(content.decode("utf-8"))
         
-        if not messages:
-            raise HTTPException(status_code=400, detail="No messages found")
+#         if not messages:
+#             raise HTTPException(status_code=400, detail="No messages found")
         
-        sentiment_data = analyze_sentiment(messages)
-        timeline = sentiment_timeline(sentiment_data)
+#         sentiment_data = analyze_sentiment(messages)
+#         timeline = sentiment_timeline(sentiment_data)
         
-        return {
-            "total_messages": len(sentiment_data),
-            "timeline": timeline
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error analyzing sentiment: {str(e)}")
+#         return {
+#             "total_messages": len(sentiment_data),
+#             "timeline": timeline
+#         }
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=f"Error analyzing sentiment: {str(e)}")
 
 
-@app.post("/analyze/initiation")
-async def initiation_analysis_endpoint(file: UploadFile = File(...), gap_hours: int = 6):
-    """
-    Analyze who initiates conversations
-    gap_hours: Hours of silence to consider a new conversation start
-    """
-    try:
-        content = await file.read()
-        messages = parse_chat(content.decode("utf-8"))
+# @app.post("/analyze/initiation")
+# async def initiation_analysis_endpoint(file: UploadFile = File(...), gap_hours: int = 6):
+#     """
+#     Analyze who initiates conversations
+#     gap_hours: Hours of silence to consider a new conversation start
+#     """
+#     try:
+#         content = await file.read()
+#         messages = parse_chat(content.decode("utf-8"))
         
-        if not messages:
-            raise HTTPException(status_code=400, detail="No messages found")
+#         if not messages:
+#             raise HTTPException(status_code=400, detail="No messages found")
         
-        initiations = initiation_analysis(messages, gap_hours=gap_hours)
+#         initiations = initiation_analysis(messages, gap_hours=gap_hours)
         
-        return {
-            "gap_hours": gap_hours,
-            "initiations": initiations,
-            "total_conversations": sum(initiations.values())
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error analyzing initiations: {str(e)}")
+#         return {
+#             "gap_hours": gap_hours,
+#             "initiations": initiations,
+#             "total_conversations": sum(initiations.values())
+#         }
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=f"Error analyzing initiations: {str(e)}")
 
 
-@app.post("/analyze/complete")
+@app.post("/complete")
 async def complete_analysis(file: UploadFile = File(...)):
     try:
         content = await file.read()
