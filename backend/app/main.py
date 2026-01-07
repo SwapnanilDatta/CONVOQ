@@ -1,197 +1,60 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+import os
+from typing import List
+from collections import defaultdict
+from dotenv import load_dotenv
+from jose import jwt
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from supabase import create_client, Client
+
 from app.services.parser import parse_chat
 from app.models.schema import UploadResponse, Message
 from app.services.sentiment import analyze_sentiment, sentiment_timeline
 from app.services.analysis import reply_time_analysis
 from app.services.initiation_analysis import initiation_analysis
 from app.services.health_score import compute_health_score
-from typing import List
-from collections import defaultdict
 from app.services.toxicity import detect_toxicity
-
 from app.services.cluster import ConversationClassifier
-classifier = ConversationClassifier()
-app = FastAPI(
-    title="CONVOQ API",
-    description="Conversation Quality Analysis Backend",
-    version="1.0.0"
+
+load_dotenv()
+
+supabase: Client = create_client(
+    os.getenv("SUPABASE_URL"),
+    os.getenv("SUPABASE_ANON_KEY")
 )
 
+classifier = ConversationClassifier()
+security = HTTPBearer()
+
+app = FastAPI(title="CONVOQ API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-@app.get("/")
-def root():
-    """Root endpoint"""
-    return {
-        "message": "CONVOQ API is running",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
-
-
-@app.get("/ping")
-def ping():
-    return {"status": "ok"}
-
-
-@app.post("/upload", response_model=UploadResponse)
-async def upload_chat(file: UploadFile = File(...)):
-
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
     try:
-        content = await file.read()
-        text = content.decode("utf-8")
-        messages = parse_chat(text)
-        
-        if not messages:
-            raise HTTPException(status_code=400, detail="No messages found in file")
-        
-        return {
-            "total_messages": len(messages),
-            "messages": messages[:50]  # Return first 50 for preview
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error parsing file: {str(e)}")
-
-
-# @app.post("/analyze/reply-time")
-# async def analyze_reply_time_endpoint(file: UploadFile = File(...)):
-#     """
-#     Analyze reply times between conversation participants
-#     Returns average reply times, fastest and slowest replies
-#     """
-#     try:
-#         content = await file.read()
-#         messages = parse_chat(content.decode("utf-8"))
-        
-#         if len(messages) < 2:
-#             raise HTTPException(status_code=400, detail="Need at least 2 messages for analysis")
-        
-#         result = reply_time_analysis(messages)
-#         return result
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=f"Error analyzing reply times: {str(e)}")
-
-
-# @app.post("/analyze/sentiment")
-# async def sentiment_analysis_endpoint(file: UploadFile = File(...)):
-#     """
-#     Analyze sentiment of conversation over time
-#     Returns daily sentiment trends
-#     """
-#     try:
-#         content = await file.read()
-#         messages = parse_chat(content.decode("utf-8"))
-        
-#         if not messages:
-#             raise HTTPException(status_code=400, detail="No messages found")
-        
-#         sentiment_data = analyze_sentiment(messages)
-#         timeline = sentiment_timeline(sentiment_data)
-        
-#         return {
-#             "total_messages": len(sentiment_data),
-#             "timeline": timeline
-#         }
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=f"Error analyzing sentiment: {str(e)}")
-
-
-# @app.post("/analyze/initiation")
-# async def initiation_analysis_endpoint(file: UploadFile = File(...), gap_hours: int = 6):
-#     """
-#     Analyze who initiates conversations
-#     gap_hours: Hours of silence to consider a new conversation start
-#     """
-#     try:
-#         content = await file.read()
-#         messages = parse_chat(content.decode("utf-8"))
-        
-#         if not messages:
-#             raise HTTPException(status_code=400, detail="No messages found")
-        
-#         initiations = initiation_analysis(messages, gap_hours=gap_hours)
-        
-#         return {
-#             "gap_hours": gap_hours,
-#             "initiations": initiations,
-#             "total_conversations": sum(initiations.values())
-#         }
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=f"Error analyzing initiations: {str(e)}")
-
-
-@app.post("/complete")
-async def complete_analysis(file: UploadFile = File(...)):
-    try:
-        content = await file.read()
-        text = content.decode("utf-8")
-        messages = parse_chat(text)
-        
-        if not messages:
-            raise HTTPException(status_code=400, detail="No messages found")
-        
-        # Run all analyses
-        reply_analysis = reply_time_analysis(messages)
-        toxicity_data = detect_toxicity(messages)
-        sentiment_data = analyze_sentiment(messages)
-        timeline = sentiment_timeline(sentiment_data)
-        initiations = initiation_analysis(messages, gap_hours=6)
-        
-        features = calculate_features(messages, reply_analysis, sentiment_data, initiations)
-        health_score = compute_health_score(features)
-
-     
-        persona = classifier.predict(features)
-        
-        # metrics_summary = { ... }
-        # narrative = generate_relationship_narrative(metrics_summary)
-        
-        return {
-            "total_messages": len(messages),
-            "participants": list(set(msg.sender for msg in messages)),
-            "toxicity": toxicity_data,
-            "health_score": health_score,
-            "persona_tag": persona, 
-            "features": features,
-            "reply_times": reply_analysis,
-            "sentiment": {
-                "total_messages": len(sentiment_data),
-                "timeline": timeline
-            },
-            "initiations": initiations
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error in complete analysis: {str(e)}")
-
+        payload = jwt.get_unverified_claims(token)
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        return user_id
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 def calculate_features(messages: List[Message], reply_analysis: dict, sentiment_data: list, initiations: dict):
-    """
-    Calculate normalized features (0-1) for health score
-    """
-    # Reply time balance
     avg_replies = list(reply_analysis["avg_reply_time"].values())
-    if len(avg_replies) >= 2:
-        reply_balance = min(avg_replies) / max(avg_replies) if max(avg_replies) > 0 else 0.5
-    else:
-        reply_balance = 0.5
+    reply_balance = min(avg_replies) / max(avg_replies) if len(avg_replies) >= 2 and max(avg_replies) > 0 else 0.5
     
-    # Initiation balance
     init_counts = list(initiations.values())
-    if len(init_counts) >= 2:
-        initiation_balance = min(init_counts) / max(init_counts) if max(init_counts) > 0 else 0.5
-    else:
-        initiation_balance = 0.5
+    initiation_balance = min(init_counts) / max(init_counts) if len(init_counts) >= 2 and max(init_counts) > 0 else 0.5
     
-    # Sentiment stability (lower variance = more stable)
     sentiments = [s["sentiment"] for s in sentiment_data]
     if sentiments:
         avg_sentiment = sum(sentiments) / len(sentiments)
@@ -200,20 +63,18 @@ def calculate_features(messages: List[Message], reply_analysis: dict, sentiment_
     else:
         sentiment_stability = 0.5
     
-    # Message length balance (simplified)
     msg_lengths = defaultdict(list)
     for msg in messages:
         msg_lengths[msg.sender].append(len(msg.message))
     
-    avg_lengths = {sender: sum(lengths) / len(lengths) for sender, lengths in msg_lengths.items()}
+    avg_lengths = {s: sum(l)/len(l) for s, l in msg_lengths.items()}
     if len(avg_lengths) >= 2:
-        length_vals = list(avg_lengths.values())
-        msg_length_balance = min(length_vals) / max(length_vals) if max(length_vals) > 0 else 0.5
+        l_vals = list(avg_lengths.values())
+        msg_length_balance = min(l_vals) / max(l_vals) if max(l_vals) > 0 else 0.5
     else:
         msg_length_balance = 0.5
     
-    # Emoji density (placeholder - could be improved)
-    emoji_count = sum(1 for msg in messages if any(char in msg.message for char in ['😊', '😂', '❤️', '👍', '🎉']))
+    emoji_count = sum(1 for m in messages if any(c in m.message for c in ['😊', '😂', '❤️', '👍', '🎉']))
     emoji_density = min(emoji_count / len(messages), 1.0) if messages else 0
     
     return {
@@ -224,7 +85,91 @@ def calculate_features(messages: List[Message], reply_analysis: dict, sentiment_
         "emoji_density": round(emoji_density, 3)
     }
 
+@app.get("/")
+def root():
+    return {"status": "online"}
 
+@app.post("/complete")
+async def complete_analysis(file: UploadFile = File(...), user_id: str = Depends(verify_token)):
+    try:
+        content = await file.read()
+        messages = parse_chat(content.decode("utf-8"))
+        
+        if not messages:
+            raise HTTPException(status_code=400, detail="No messages found")
+        
+        # ... (Analyses logic: reply_analysis, toxicity, sentiment, etc.) ...
+        reply_analysis = reply_time_analysis(messages)
+        toxicity_data = detect_toxicity(messages)
+        sentiment_data = analyze_sentiment(messages)
+        timeline = sentiment_timeline(sentiment_data)
+        initiations = initiation_analysis(messages, gap_hours=6)
+        
+        features = calculate_features(messages, reply_analysis, sentiment_data, initiations)
+        health_score = compute_health_score(features)
+        persona = classifier.predict(features)
+
+        # --- CORRECTED SUPABASE LOGIC ---
+        
+        # 1. Check if user exists
+        user_query = supabase.table("users").select("id").eq("clerk_id", user_id).execute()
+        
+        if not user_query.data:
+            # 2. Insert new user and get the returned UUID (id)
+            new_user = supabase.table("users").insert({"clerk_id": user_id}).execute()
+            db_uuid = new_user.data[0]["id"]
+        else:
+            # 2. Get the existing UUID
+            db_uuid = user_query.data[0]["id"]
+        
+        # 3. Insert analysis using the UUID, NOT the Clerk string
+        full_data = {
+            "total_messages": len(messages),
+            "participants": list(set(msg.sender for msg in messages)),
+            "toxicity": toxicity_data,
+            "health_score": health_score,
+            "persona_tag": persona, 
+            "features": features,
+            "reply_times": reply_analysis,
+            "sentiment": {"total_messages": len(sentiment_data), "timeline": timeline},
+            "initiations": initiations
+        }
+        
+        supabase.table("analyses").insert({
+            "user_id": db_uuid,  # This matches your UUID REFERENCES users(id)
+            "total_messages": len(messages),
+            "health_score": health_score,
+            "persona_tag": persona,
+            "full_data": full_data
+        }).execute()
+        
+        return full_data
+    except Exception as e:
+        print(f"Error Detail: {str(e)}") # This will show in your terminal
+        raise HTTPException(status_code=500, detail="Database or Analysis Error")
+    
+@app.get("/history")
+async def get_analysis_history(user_id: str = Depends(verify_token)):
+    try:
+        # 1. Get the internal UUID for this clerk_id
+        user_query = supabase.table("users").select("id").eq("clerk_id", user_id).execute()
+        
+        if not user_query.data:
+            return [] # New user, no history yet
+
+        db_uuid = user_query.data[0]["id"]
+
+        # 2. Fetch all analyses for this UUID, sorted by newest first
+        history = supabase.table("analyses") \
+            .select("id, total_messages, health_score, persona_tag, created_at, full_data") \
+            .eq("user_id", db_uuid) \
+            .order("created_at", desc=True) \
+            .execute()
+
+        return history.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
+    
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

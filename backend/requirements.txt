@@ -4,3 +4,4 @@ python-multipart
 nltk
 scikit-learn
 python-dotenv
+supabase

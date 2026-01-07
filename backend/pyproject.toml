@@ -9,7 +9,9 @@ dependencies = [
     "fastapi>=0.124.4",
     "nltk>=3.9.2",
     "pydantic>=2.12.5",
+    "python-jose[cryptography]>=3.5.0",
     "python-multipart>=0.0.20",
     "scikit-learn>=1.8.0",
+    "supabase>=2.27.1",
     "uvicorn[standard]>=0.38.0",
 ]

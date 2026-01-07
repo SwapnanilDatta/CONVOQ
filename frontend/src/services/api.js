@@ -1,37 +1,48 @@
 import { API_BASE_URL } from '../utils/constants';
 
-export const uploadFile = async (file) => {
+// export const uploadFile = async (file) => {
+//   const formData = new FormData();
+//   formData.append('file', file);
+
+//   const response = await fetch(`${API_BASE_URL}/upload`, {
+//     method: 'POST',
+//     body: formData
+//   });
+
+//   if (!response.ok) {
+//     throw new Error('Upload failed');
+//   }
+
+//   return response.json();
+// };
+
+import axios from 'axios';
+
+export const getCompleteAnalysis = async (file, token) => {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(`${API_BASE_URL}/upload`, {
-    method: 'POST',
-    body: formData
+  const response = await axios.post(`${API_BASE_URL}/complete`, formData, {
+    headers: {
+    
+      'Authorization': `Bearer ${token}`, 
+      'Content-Type': 'multipart/form-data',
+    },
   });
 
-  if (!response.ok) {
-    throw new Error('Upload failed');
-  }
-
-  return response.json();
+  return response.data;
 };
 
-export const getCompleteAnalysis = async (file) => {
-  const formData = new FormData();
-  // 'file' must match the key name in your Postman screenshot
-  formData.append('file', file); 
 
-  const response = await fetch(`${API_BASE_URL}/complete`, {
-    method: 'POST',
-    // DO NOT add headers: { 'Content-Type': 'multipart/form-data' }
-    // Let the browser set it so it includes the correct "boundary"
-    body: formData,
+
+export const getHistory = async (token) => {
+  const response = await fetch(`${API_BASE_URL}/history`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
   });
 
-  if (!response.ok) {
-    const errorBody = await response.json();
-    throw new Error(errorBody.detail || 'Analysis failed');
-  }
-
+  if (!response.ok) throw new Error('Failed to fetch history');
   return response.json();
 };
