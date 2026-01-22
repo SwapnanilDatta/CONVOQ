@@ -16,6 +16,8 @@ from app.services.initiation_analysis import initiation_analysis
 from app.services.health_score import compute_health_score
 from app.services.toxicity import detect_toxicity
 from app.services.cluster import ConversationClassifier
+from app.services.coach import generate_relationship_narrative
+from app.services.semantic import analyze_semantics
 
 load_dotenv()
 
@@ -98,16 +100,24 @@ async def complete_analysis(file: UploadFile = File(...), user_id: str = Depends
         if not messages:
             raise HTTPException(status_code=400, detail="No messages found")
         
-        # ... (Analyses logic: reply_analysis, toxicity, sentiment, etc.) ...
         reply_analysis = reply_time_analysis(messages)
         toxicity_data = detect_toxicity(messages)
         sentiment_data = analyze_sentiment(messages)
         timeline = sentiment_timeline(sentiment_data)
         initiations = initiation_analysis(messages, gap_hours=6)
+        semantic_data = analyze_semantics(messages)
         
         features = calculate_features(messages, reply_analysis, sentiment_data, initiations)
         health_score = compute_health_score(features)
         persona = classifier.predict(features)
+        
+        coach_narrative = generate_relationship_narrative({
+            "participants": list(set(msg.sender for msg in messages)),
+            "health_score": health_score,
+            "initiations": initiations,
+            "features": features
+        })
+
 
         # --- CORRECTED SUPABASE LOGIC ---
         
@@ -131,8 +141,11 @@ async def complete_analysis(file: UploadFile = File(...), user_id: str = Depends
             "persona_tag": persona, 
             "features": features,
             "reply_times": reply_analysis,
+            "reply_times": reply_analysis,
             "sentiment": {"total_messages": len(sentiment_data), "timeline": timeline},
-            "initiations": initiations
+            "initiations": initiations,
+            "semantic_analysis": semantic_data,
+            "coach_summary": coach_narrative,
         }
         
         supabase.table("analyses").insert({

@@ -1,18 +1,45 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@import "tailwindcss";
+
+@theme {
+  --color-neon-purple: #b026ff;
+  --color-neon-green: #39ff14;
+  --color-neon-blue: #04d9ff;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Outfit", sans-serif;
+}
+
+@layer components {
+  .chart-card {
+    @apply bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl transition-all hover:bg-slate-900/50;
+  }
+
+  .chart-title {
+    @apply text-xl font-bold font-display mb-2 text-white;
+  }
+
+  .chart-subtitle {
+    @apply text-sm text-slate-400 mb-6 font-body;
+  }
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  @apply bg-slate-950 text-slate-50 antialiased font-body selection:bg-purple-500/30 selection:text-purple-200;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }

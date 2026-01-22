@@ -5,3 +5,5 @@ nltk
 scikit-learn
 python-dotenv
 supabase
+groq
+spacy
