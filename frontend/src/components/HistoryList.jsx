@@ -21,15 +21,7 @@ const HistoryList = ({ onSelect }) => {
       }
     };
     fetchHistory();
-  }, [history]); // Re-fetch when history changes (triggered by parent potentially?) 
-  // Warning: explicit dependency on 'history' might cause loops if not careful. 
-  // Actually, better to expose a refresh method or just fetch on mount.
-  // Given I can't easily change the parent-child contract without editing Dashboard again, 
-  // I'll stick to mount fetch but maybe use a custom event or context later. 
-  // For now, I'll remove the dependency on 'history' to avoid loop, 
-  // but if the user uploads a file, this list won't update automatically 
-  // unless Dashboard forces it. 
-  // Dashboard re-renders when analysisData changes, but HistoryList is a child.
+  }, []); // Only fetch on mount
 
   // Let's stick to simple styling first. Using 'key={index}' is bad practice, prefer 'item.id' if available.
 
