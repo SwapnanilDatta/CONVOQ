@@ -50,7 +50,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-def calculate_features(messages: List[Message], reply_analysis: dict, sentiment_data: list, initiations: dict):
+def calculate_features(messages: List[Message], reply_analysis: dict, sentiment_data: list, initiations: dict, toxicity_data: dict):
     avg_replies = list(reply_analysis["avg_reply_time"].values())
     reply_balance = min(avg_replies) / max(avg_replies) if len(avg_replies) >= 2 and max(avg_replies) > 0 else 0.5
     
@@ -78,13 +78,14 @@ def calculate_features(messages: List[Message], reply_analysis: dict, sentiment_
     
     emoji_count = sum(1 for m in messages if any(c in m.message for c in ['😊', '😂', '❤️', '👍', '🎉']))
     emoji_density = min(emoji_count / len(messages), 1.0) if messages else 0
-    
+    tox_rate = toxicity_data.get("toxicity_rate", 0) / 100
     return {
         "reply_time_balance": round(reply_balance, 3),
         "initiation_balance": round(initiation_balance, 3),
         "sentiment_stability": round(sentiment_stability, 3),
         "msg_length_balance": round(msg_length_balance, 3),
-        "emoji_density": round(emoji_density, 3)
+        "emoji_density": round(emoji_density, 3),
+        "toxicity_impact": round(tox_rate, 3)
     }
 
 @app.get("/")
@@ -105,9 +106,9 @@ async def complete_analysis(file: UploadFile = File(...), user_id: str = Depends
         sentiment_data = analyze_sentiment(messages)
         timeline = sentiment_timeline(sentiment_data)
         initiations = initiation_analysis(messages, gap_hours=6)
-        semantic_data = analyze_semantics(messages)
+        semantic_data = analyze_semantics(messages, toxicity_data=toxicity_data)
         
-        features = calculate_features(messages, reply_analysis, sentiment_data, initiations)
+        features = calculate_features(messages, reply_analysis, sentiment_data, initiations, toxicity_data)
         health_score = compute_health_score(features)
         persona = classifier.predict(features)
         

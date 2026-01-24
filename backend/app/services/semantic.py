@@ -1,18 +1,15 @@
 import os
 import json
-from typing import List, Dict
+from typing import List, Dict, Optional
 from datetime import timedelta
 from app.models.schema import Message
-from app.services.sentiment import sia  # Reusing your existing VADER instance
-from app.services.analysis import parse_timestamp # Reusing your timestamp parser
+from app.services.sentiment import sia 
+from app.services.analysis import parse_timestamp 
 from groq import Groq
 
-def analyze_semantics(messages: List[Message], gap_minutes: int = 20) -> Dict:
+def analyze_semantics(messages: List[Message], gap_minutes: int = 20, toxicity_data: Optional[Dict] = None) -> Dict:
     """
-    Production-grade semantic pipeline:
-    1. Chunk messages by time gaps.
-    2. FILTER: Run local heuristic (sentiment + keywords) to find "Suspicious" chunks.
-    3. JUDGE: Send only suspicious chunks to Groq LLM for classification.
+    Production-grade semantic pipeline with Toxicity integration.
     """
     
     # --- Step 1: Create Interaction Windows (Chunks) ---
@@ -41,30 +38,31 @@ def analyze_semantics(messages: List[Message], gap_minutes: int = 20) -> Dict:
 
     # --- Step 2: The "Cheap" Filter (Local) ---
     suspicious_chunks = []
-    
-    # Keywords that might indicate conflict (Gen Z + Standard)
     trigger_words = {"hate", "blocking", "wtf", "rude", "stop", "whatever", "k", "fine", "dead", "bruh"}
     
+    # Extract timestamps of messages flagged as toxic by toxicity.py
+    toxic_timestamps = set()
+    if toxicity_data and "toxic_messages" in toxicity_data:
+        toxic_timestamps = {m["timestamp"] for m in toxicity_data["toxic_messages"]}
+    
     for chunk in chunks:
-        # Skip noise: chunks too short are rarely deep semantic events
-        if len(chunk) < 4:
+        if len(chunk) < 2: # Lowered limit to catch short but toxic interactions
             continue
             
-        # Calculate Chunk Vibe
         text_blob = " ".join([m.message.lower() for m in chunk])
         scores = [sia.polarity_scores(m.message)['compound'] for m in chunk]
         avg_sentiment = sum(scores) / len(scores)
-        
-        # Count Trigger Words
         trigger_count = sum(1 for word in trigger_words if word in text_blob.split())
         
-        # THE FILTER LOGIC
-        # 1. High negative sentiment
-        # 2. OR Multiple trigger words present
-        is_suspicious = (avg_sentiment < -0.15) or (trigger_count >= 2)
+        # Check if this chunk contains any message already flagged as toxic
+        contains_known_toxicity = any(m.timestamp in toxic_timestamps for m in chunk)
+        
+        # FILTER LOGIC:
+        # 1. High negative sentiment OR trigger words
+        # 2. OR Known toxicity detected by the Toxic-BERT/Keyword model
+        is_suspicious = (avg_sentiment < -0.15) or (trigger_count >= 2) or contains_known_toxicity
         
         if is_suspicious:
-            # Format for LLM: "User: Message"
             formatted_convo = [f"{m.sender}: {m.message}" for m in chunk]
             suspicious_chunks.append({
                 "msgs": formatted_convo,
@@ -72,14 +70,21 @@ def analyze_semantics(messages: List[Message], gap_minutes: int = 20) -> Dict:
                 "timestamp": chunk[0].timestamp
             })
 
-    # Limit to top 3 most intense chunks to save API tokens
+    # Sort by intensity and limit to top 3
     suspicious_chunks = sorted(suspicious_chunks, key=lambda x: x['sentiment'])[:3]
 
-    # --- Step 3: The "Expensive" Judge (Groq LLM) ---
+    # --- Step 3: The "Expensive" Judge ---
     if not suspicious_chunks:
         return {"status": "Peaceful", "events": []}
 
-    return batch_analyze_with_groq(suspicious_chunks)
+    # If toxicity exists but no "events" were categorized yet, we force an "Analyzed" status
+    # to prevent the Frontend from showing the "Immaculate" green box.
+    result = batch_analyze_with_groq(suspicious_chunks)
+    
+    if toxicity_data and toxicity_data.get("toxic_count", 0) > 0:
+        result["status"] = "High Tension" # This overrides "Peaceful"
+        
+    return result
 
 def batch_analyze_with_groq(chunks: List[Dict]) -> Dict:
     api_key = os.getenv("GROQ_API_KEY")
@@ -87,23 +92,23 @@ def batch_analyze_with_groq(chunks: List[Dict]) -> Dict:
         return {"error": "No API Key"}
 
     client = Groq(api_key=api_key)
-
-    # We pack multiple chunks into ONE prompt to save network calls
     prompt_content = json.dumps([{ "id": i, "convo": c["msgs"] } for i, c in enumerate(chunks)])
 
     system_prompt = """
     You are an expert semantic analyst. Analyze these conversation chunks. 
-    For each chunk, determine if it is a "Quarrel", "Misunderstanding", "Vent", or "Banter" (Playful fighting).
+    Classify as "Quarrel", "Banter", or "Serious".
     
-    Output ONLY valid JSON in this format:
-    [
-      {
-        "id": 0,
-        "type": "Quarrel" | "Banter" | "Serious",
-        "confidence": 0.9,
-        "summary": "Brief 1-sentence explanation of what happened."
-      }
-    ]
+    Output ONLY valid JSON:
+    {
+      "events": [
+        {
+          "id": 0,
+          "type": "Quarrel" | "Banter" | "Serious",
+          "confidence": 0.9,
+          "summary": "Brief 1-sentence explanation."
+        }
+      ]
+    }
     """
 
     try:
@@ -111,18 +116,17 @@ def batch_analyze_with_groq(chunks: List[Dict]) -> Dict:
             model="llama-3.1-8b-instant",
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Analyze these conversations: {prompt_content}"}
+                {"role": "user", "content": f"Analyze: {prompt_content}"}
             ],
             temperature=0.0,
             response_format={"type": "json_object"} 
         )
         
-        analysis_result = json.loads(completion.choices[0].message.content)
+        raw_content = completion.choices[0].message.content
+        analysis_result = json.loads(raw_content)
         
-        # Merge LLM results back with timestamp data
         final_events = []
-        # Handle case where LLM returns a dict with a key 'events' or just a list
-        results_list = analysis_result if isinstance(analysis_result, list) else analysis_result.get("events", analysis_result.get("analysis", []))
+        results_list = analysis_result.get("events", [])
         
         for res in results_list:
             chunk_id = res.get("id")
@@ -137,5 +141,5 @@ def batch_analyze_with_groq(chunks: List[Dict]) -> Dict:
         return {"status": "Analyzed", "events": final_events}
 
     except Exception as e:
-        print(f"Semantic Analysis Error: {e}")
+        print(f"Groq Error: {e}")
         return {"status": "Error", "events": []}

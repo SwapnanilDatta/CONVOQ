@@ -27,8 +27,8 @@ class ConversationClassifier:
         # 1. HARD OVERRIDE (The "Human Vibe" Logic)
         # If the length balance is perfect and they are using emojis, 
         # it's NOT Professional, even if reply time is a bit off.
-        if features['msg_length_balance'] > 0.8 and features['emoji_density'] > 0.1:
-            return self.persona_names[0] # Force "Synchronized Duo"
+        if features.get('toxicity_impact', 0) > 0.1:
+            return "High Conflict / Toxic"
 
         # 2. VECTOR PREDICTION
         vector = np.array([[

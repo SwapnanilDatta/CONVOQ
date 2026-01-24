@@ -47,7 +47,7 @@ const OverviewStats = ({ data }) => {
       icon: isToxic ? Flame : Ghost,
       label: isToxic ? 'Cooked' : 'Chill',
       subLabel: 'Toxicity Rate',
-      value: `${(toxicityVal * 100).toFixed(1)}%`,
+      value: `${(toxicityVal).toFixed(1)}%`,
       color: isToxic ? 'red' : 'green'
     }
   ];
