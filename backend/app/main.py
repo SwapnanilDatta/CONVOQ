@@ -18,6 +18,8 @@ from app.services.toxicity import detect_toxicity
 from app.services.cluster import ConversationClassifier
 from app.services.coach import generate_relationship_narrative
 from app.services.semantic import analyze_semantics
+from app.utils.rate_limiter import RateLimiter
+from app.utils.token_counter import TokenCounter
 
 load_dotenv()
 
@@ -28,6 +30,10 @@ supabase: Client = create_client(
 
 classifier = ConversationClassifier()
 security = HTTPBearer()
+
+# Initialize rate limiter and token counter
+rate_limiter = RateLimiter(requests_per_minute=3, requests_per_day=50)
+token_counter = TokenCounter(daily_token_limit=10000)
 
 app = FastAPI(title="CONVOQ API")
 
@@ -95,11 +101,24 @@ def root():
 @app.post("/complete")
 async def complete_analysis(file: UploadFile = File(...), user_id: str = Depends(verify_token)):
     try:
+        # --- RATE LIMITING CHECK ---
+        allowed, rate_msg = rate_limiter.is_allowed(user_id)
+        if not allowed:
+            raise HTTPException(status_code=429, detail=rate_msg)
+        
         content = await file.read()
         messages = parse_chat(content.decode("utf-8"))
         
         if not messages:
             raise HTTPException(status_code=400, detail="No messages found")
+        
+        # --- TOKEN COUNTING: Estimate tokens for this request ---
+        estimated_tokens = token_counter.estimate_messages_tokens(messages)
+        
+        # Check if user has enough tokens left
+        can_process, token_msg = token_counter.can_process(user_id, estimated_tokens)
+        if not can_process:
+            raise HTTPException(status_code=429, detail=token_msg)
         
         reply_analysis = reply_time_analysis(messages)
         toxicity_data = detect_toxicity(messages)
@@ -119,6 +138,13 @@ async def complete_analysis(file: UploadFile = File(...), user_id: str = Depends
             "features": features
         })
 
+        # --- RECORD USAGE ---
+        rate_limiter.record_request(user_id)
+        token_counter.record_tokens(user_id, estimated_tokens)
+        
+        # Get updated usage stats
+        rate_usage = rate_limiter.get_usage(user_id)
+        token_usage = token_counter.get_today_usage(user_id)
 
         # --- CORRECTED SUPABASE LOGIC ---
         
@@ -142,15 +168,18 @@ async def complete_analysis(file: UploadFile = File(...), user_id: str = Depends
             "persona_tag": persona, 
             "features": features,
             "reply_times": reply_analysis,
-            "reply_times": reply_analysis,
             "sentiment": {"total_messages": len(sentiment_data), "timeline": timeline},
             "initiations": initiations,
             "semantic_analysis": semantic_data,
             "coach_summary": coach_narrative,
+            "usage_stats": {
+                "rate_limiting": rate_usage,
+                "token_counting": token_usage
+            }
         }
         
         supabase.table("analyses").insert({
-            "user_id": db_uuid,  # This matches your UUID REFERENCES users(id)
+            "user_id": db_uuid,
             "total_messages": len(messages),
             "health_score": health_score,
             "persona_tag": persona,
@@ -183,6 +212,34 @@ async def get_analysis_history(user_id: str = Depends(verify_token)):
         return history.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
+
+@app.get("/usage")
+async def get_usage_stats(user_id: str = Depends(verify_token)):
+    """Get current rate limit and token usage stats for authenticated user."""
+    try:
+        rate_usage = rate_limiter.get_usage(user_id)
+        token_usage = token_counter.get_today_usage(user_id)
+        
+        return {
+            "user_id": user_id,
+            "rate_limiting": {
+                "requests_this_minute": rate_usage["requests_this_minute"],
+                "requests_today": rate_usage["requests_today"],
+                "minute_limit": rate_usage["minute_limit"],
+                "daily_limit": rate_usage["daily_limit"],
+                "remaining_requests_today": rate_usage["remaining_today"],
+                "status": "⚠️ Limited" if rate_usage["requests_this_minute"] >= rate_usage["minute_limit"] else "✅ OK"
+            },
+            "token_counting": {
+                "tokens_used_today": token_usage["tokens_used_today"],
+                "tokens_remaining": token_usage["remaining_tokens"],
+                "daily_limit": token_usage["daily_limit"],
+                "usage_percentage": token_usage["percentage_used"],
+                "status": "⚠️ Critical" if token_usage["percentage_used"] > 85 else ("⚠️ Warning" if token_usage["percentage_used"] > 70 else "✅ OK")
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch usage: {str(e)}")
     
 if __name__ == "__main__":
     import uvicorn

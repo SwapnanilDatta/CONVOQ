@@ -13,6 +13,7 @@ import ErrorDisplay from '../components/ErrorDisplay';
 import HistoryList from '../components/HistoryList';
 import CoachSummary from '../components/CoachSummary';
 import SemanticVibeCheck from '../components/SemanticVibeCheck';
+import UsageQuota from '../components/UsageQuota';
 import { getCompleteAnalysis, getHistory } from '../services/api';
 
 const Dashboard = () => {
@@ -20,9 +21,19 @@ const Dashboard = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [, setHistory] = useState([]); // Used to trigger updates
+    const [usageRefresh, setUsageRefresh] = useState(0); // Trigger usage quota refresh
+    const [token, setToken] = useState(null);
 
     const { user } = useUser();
     const { getToken } = useAuth();
+
+    useEffect(() => {
+        const initToken = async () => {
+            const authToken = await getToken();
+            setToken(authToken);
+        };
+        if (user) initToken();
+    }, [user]);
 
     const loadHistory = async () => {
         try {
@@ -46,6 +57,8 @@ const Dashboard = () => {
             const data = await getCompleteAnalysis(file, token);
             setAnalysisData(data);
             loadHistory();
+            // Refresh usage quota after successful upload
+            setUsageRefresh(prev => prev + 1);
         } catch (err) {
             setError(err.message || 'Something went wrong');
         } finally {
@@ -86,9 +99,17 @@ const Dashboard = () => {
 
                 {/* Sidebar */}
                 <div className="lg:col-span-1">
-                    <div className="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-white/10 p-4 sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto">
-                        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 px-2">History</h3>
-                        <HistoryList onSelect={handleSelectAnalysis} />
+                    <div className="space-y-4">
+                        {/* Usage Quota */}
+                        {token && <div className="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-white/10 p-4">
+                            <UsageQuota token={token} refreshTrigger={usageRefresh} />
+                        </div>}
+
+                        {/* History */}
+                        <div className="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-white/10 p-4 sticky top-24 max-h-[calc(100vh-240px)] overflow-y-auto">
+                            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 px-2">History</h3>
+                            <HistoryList onSelect={handleSelectAnalysis} />
+                        </div>
                     </div>
                 </div>
 
