@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "cachetools>=6.2.4",
     "detoxify>=0.5.2",
     "en-core-web-sm",
     "fastapi>=0.124.4",

@@ -10,3 +10,4 @@ python-jose[cryptography]
 pydantic
 pydantic-settings
 tiktoken
+cachetools

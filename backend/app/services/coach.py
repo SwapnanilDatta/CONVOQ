@@ -1,6 +1,6 @@
 import os
 from groq import Groq
-
+import json
 
 def generate_relationship_narrative(metrics: dict) -> str:
     """
@@ -66,3 +66,71 @@ def generate_relationship_narrative(metrics: dict) -> str:
     except Exception as e:
         print(f"Groq API Error: {e}")
         return "Coach dipped due to an API issue. Check the logs."
+
+def generate_decision_advice(trend_data: dict) -> dict:
+    """
+    Generates specific advice and reply suggestions based on the trend decision.
+    """
+    api_key = os.getenv("GROQ_API_KEY")
+    # Default fallback
+    fallback = {
+        "advice": ["Reflect on your boundaries.", "Consider taking a break."],
+        "reply_suggestions": ["Hey, I need some space.", "Can we talk later?", "I've been feeling a bit off about our chats."]
+    }
+
+    if not api_key:
+        return fallback
+
+    client = Groq(api_key=api_key)
+
+    decision = trend_data.get("decision", "Unknown")
+    
+    if decision == "Not Enough Data":
+        return {
+            "advice": [],
+            "reply_suggestions": []
+        }
+
+    reasons = trend_data.get("reasons", [])
+    
+    prompt = f"""
+    The analysis system has output the following decision for a relationship chat history:
+    
+    DECISION: {decision}
+    REASONS DETECTED: {', '.join(reasons)}
+    
+    TASK:
+    1. Provide 3 specific, actionable bullet points of advice for the user.
+    2. Provide 3 specific outcome-oriented text message reply examples the user could send to address the situation.
+    
+    OUTPUT FORMAT:
+    Return valid JSON only:
+    {{
+        "advice": ["tip 1", "tip 2", "tip 3"],
+        "reply_suggestions": ["text 1", "text 2", "text 3"]
+    }}
+    
+    TONE:
+    Direct, helpful, and realistic. If the decision is "Pause/Reconsider", the texts should be firm boundary-setting. If "Continue", they should be engaging.
+    """
+    
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            temperature=0.7,
+            max_tokens=300,
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system", 
+                    "content": "You are a relationship strategy expert. Return valid JSON only."
+                },
+                {"role": "user", "content": prompt}
+            ]
+        )
+        
+        return json.loads(completion.choices[0].message.content)
+        
+    except Exception as e:
+        print(f"Groq Advice Error: {e}")
+        return fallback

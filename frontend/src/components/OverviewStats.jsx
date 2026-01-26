@@ -5,6 +5,7 @@ const OverviewStats = ({ data }) => {
   const totalMessages = data.total_messages;
 
   const toxicityVal = data.toxicity?.toxicity_rate || 0;
+  const isToxicLocked = data.toxicity?.status === 'locked';
   const isToxic = toxicityVal > 0.15;
 
   const colorConfig = {
@@ -13,6 +14,7 @@ const OverviewStats = ({ data }) => {
     red: 'bg-red-500/20 text-red-400 border-red-500/30',
     pink: 'bg-pink-500/20 text-pink-400 border-pink-500/30',
     cyan: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+    gray: 'bg-slate-700/20 text-slate-400 border-slate-700/30',
   };
 
   const getHealthColor = (score) => {
@@ -33,8 +35,8 @@ const OverviewStats = ({ data }) => {
       icon: Heart,
       label: 'Vibe Score',
       subLabel: 'Health Score',
-      value: `${data.health_score.toFixed(0)}/100`,
-      color: getHealthColor(data.health_score)
+      value: isToxicLocked ? "Locked 🔒" : `${data.health_score.toFixed(0)}/100`,
+      color: isToxicLocked ? 'gray' : getHealthColor(data.health_score)
     },
     {
       icon: Zap,
@@ -47,8 +49,8 @@ const OverviewStats = ({ data }) => {
       icon: isToxic ? Flame : Ghost,
       label: isToxic ? 'Cooked' : 'Chill',
       subLabel: 'Toxicity Rate',
-      value: `${(toxicityVal).toFixed(1)}%`,
-      color: isToxic ? 'red' : 'green'
+      value: isToxicLocked ? "Locked 🔒" : `${(toxicityVal).toFixed(1)}%`,
+      color: isToxic && !isToxicLocked ? 'red' : 'green'
     }
   ];
 

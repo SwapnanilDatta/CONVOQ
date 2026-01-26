@@ -1,31 +1,14 @@
 import { API_BASE_URL } from '../utils/constants';
-
-// export const uploadFile = async (file) => {
-//   const formData = new FormData();
-//   formData.append('file', file);
-
-//   const response = await fetch(`${API_BASE_URL}/upload`, {
-//     method: 'POST',
-//     body: formData
-//   });
-
-//   if (!response.ok) {
-//     throw new Error('Upload failed');
-//   }
-
-//   return response.json();
-// };
-
 import axios from 'axios';
 
+// Fast Analysis
 export const getCompleteAnalysis = async (file, token) => {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await axios.post(`${API_BASE_URL}/complete`, formData, {
+  const response = await axios.post(`${API_BASE_URL}/analyze/fast`, formData, {
     headers: {
-    
-      'Authorization': `Bearer ${token}`, 
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'multipart/form-data',
     },
   });
@@ -33,7 +16,20 @@ export const getCompleteAnalysis = async (file, token) => {
   return response.data;
 };
 
+// Deep Analysis
+export const getDeepAnalysis = async (cacheKey, analysisId, token) => {
+  const response = await axios.post(`${API_BASE_URL}/analyze/deep`, {
+    cache_key: cacheKey,
+    analysis_id: analysisId
+  }, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
 
+  return response.data;
+};
 
 export const getHistory = async (token) => {
   const response = await fetch(`${API_BASE_URL}/history`, {

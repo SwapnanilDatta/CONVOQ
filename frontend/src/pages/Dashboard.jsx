@@ -13,16 +13,18 @@ import ErrorDisplay from '../components/ErrorDisplay';
 import HistoryList from '../components/HistoryList';
 import CoachSummary from '../components/CoachSummary';
 import SemanticVibeCheck from '../components/SemanticVibeCheck';
-import UsageQuota from '../components/UsageQuota';
-import { getCompleteAnalysis, getHistory } from '../services/api';
+import RelationshipHealthGrid from '../components/RelationshipHealthGrid';
+import { getCompleteAnalysis, getHistory, getDeepAnalysis } from '../services/api';
 
 const Dashboard = () => {
     const [analysisData, setAnalysisData] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [, setHistory] = useState([]); // Used to trigger updates
-    const [usageRefresh, setUsageRefresh] = useState(0); // Trigger usage quota refresh
+
     const [token, setToken] = useState(null);
+    const [deepLoading, setDeepLoading] = useState(false);
+    const [analysisKeys, setAnalysisKeys] = useState({ cacheKey: null, analysisId: null });
 
     const { user } = useUser();
     const { getToken } = useAuth();
@@ -55,14 +57,43 @@ const Dashboard = () => {
         try {
             const token = await getToken();
             const data = await getCompleteAnalysis(file, token);
+            if (data.cache_key) {
+                setAnalysisKeys({ cacheKey: data.cache_key, analysisId: data.analysis_id });
+            }
             setAnalysisData(data);
             loadHistory();
-            // Refresh usage quota after successful upload
-            setUsageRefresh(prev => prev + 1);
         } catch (err) {
             setError(err.message || 'Something went wrong');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleDeepScan = async () => {
+        if (!analysisKeys.cacheKey || !analysisKeys.analysisId) return;
+
+        setDeepLoading(true);
+        try {
+            const token = await getToken();
+            const deepData = await getDeepAnalysis(analysisKeys.cacheKey, analysisKeys.analysisId, token);
+
+            // Merge deep data into current analysisData
+            setAnalysisData(prev => ({
+                ...prev,
+                ...deepData,
+                trend_analysis: deepData.trend_analysis || prev.trend_analysis,
+                analysis_status: 'complete'
+            }));
+
+            // Clear keys to prevent re-triggering? optional.
+            // setAnalysisKeys({ cacheKey: null, analysisId: null });
+
+        } catch (err) {
+            console.error(err);
+            // Don't nuke the whole view, just alert
+            alert("Deep scan failed: " + (err.response?.data?.detail || err.message));
+        } finally {
+            setDeepLoading(false);
         }
     };
 
@@ -100,11 +131,6 @@ const Dashboard = () => {
                 {/* Sidebar */}
                 <div className="lg:col-span-1">
                     <div className="space-y-4">
-                        {/* Usage Quota */}
-                        {token && <div className="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-white/10 p-4">
-                            <UsageQuota token={token} refreshTrigger={usageRefresh} />
-                        </div>}
-
                         {/* History */}
                         <div className="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-white/10 p-4 sticky top-24 max-h-[calc(100vh-240px)] overflow-y-auto">
                             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 px-2">History</h3>
@@ -158,6 +184,15 @@ const Dashboard = () => {
 
                             {/* 1. High Level Stats */}
                             <OverviewStats data={analysisData} />
+
+                            {/* 1.5 Decision & Trends */}
+                            <RelationshipHealthGrid
+                                trendData={analysisData.trend_analysis}
+                                adviceData={analysisData.decision_advice}
+                                onDeepScan={handleDeepScan}
+                                isDeepLoading={deepLoading}
+                                status={analysisData.analysis_status}
+                            />
 
                             {/* 2. The Coach's Roast */}
                             <div className="grid gap-6">

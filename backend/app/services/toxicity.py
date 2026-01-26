@@ -46,7 +46,6 @@ def detect_toxicity(messages: List[Message]):
             toxic_messages.append({
                 "timestamp": msg.timestamp,
                 "sender": msg.sender,
-                "message": msg.message[:100],
                 "scores": scores,
                 "severity": "high" if (scores.get('toxic', 0) > 0.7 or local_toxic) else "moderate"
             })

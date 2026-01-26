@@ -1,23 +1,26 @@
 import os
+import uuid
 from typing import List
 from collections import defaultdict
 from dotenv import load_dotenv
 from jose import jwt
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import create_client, Client
+from cachetools import TTLCache
 
 from app.services.parser import parse_chat
-from app.models.schema import UploadResponse, Message
+from app.models.schema import UploadResponse, Message, DeepAnalysisRequest
 from app.services.sentiment import analyze_sentiment, sentiment_timeline
 from app.services.analysis import reply_time_analysis
 from app.services.initiation_analysis import initiation_analysis
 from app.services.health_score import compute_health_score
 from app.services.toxicity import detect_toxicity
 from app.services.cluster import ConversationClassifier
-from app.services.coach import generate_relationship_narrative
+from app.services.coach import generate_relationship_narrative, generate_decision_advice
 from app.services.semantic import analyze_semantics
+from app.services.trend_analysis import evaluate_trends
 from app.utils.rate_limiter import RateLimiter
 from app.utils.token_counter import TokenCounter
 
@@ -30,6 +33,9 @@ supabase: Client = create_client(
 
 classifier = ConversationClassifier()
 security = HTTPBearer()
+
+# Cache for storing parsed messages. ID -> Message List. TTL=600s (10 min)
+message_cache = TTLCache(maxsize=100, ttl=600)
 
 # Initialize rate limiter and token counter
 rate_limiter = RateLimiter(requests_per_minute=3, requests_per_day=50)
@@ -98,13 +104,21 @@ def calculate_features(messages: List[Message], reply_analysis: dict, sentiment_
 def root():
     return {"status": "online"}
 
-@app.post("/complete")
-async def complete_analysis(file: UploadFile = File(...), user_id: str = Depends(verify_token)):
+def get_db_user_uuid(clerk_id: str) -> str:
+    user_query = supabase.table("users").select("id").eq("clerk_id", clerk_id).execute()
+    if not user_query.data:
+        new_user = supabase.table("users").insert({"clerk_id": clerk_id}).execute()
+        return new_user.data[0]["id"]
+    return user_query.data[0]["id"]
+
+@app.post("/analyze/fast")
+async def analyze_fast(file: UploadFile = File(...), user_id: str = Depends(verify_token)):
     try:
-        # --- RATE LIMITING CHECK ---
-        allowed, rate_msg = rate_limiter.is_allowed(user_id)
-        if not allowed:
-            raise HTTPException(status_code=429, detail=rate_msg)
+        # Rate Limit
+        # Rate Limit
+        # allowed, rate_msg = rate_limiter.is_allowed(user_id)
+        # if not allowed:
+        #     raise HTTPException(status_code=429, detail=rate_msg)
         
         content = await file.read()
         messages = parse_chat(content.decode("utf-8"))
@@ -112,54 +126,41 @@ async def complete_analysis(file: UploadFile = File(...), user_id: str = Depends
         if not messages:
             raise HTTPException(status_code=400, detail="No messages found")
         
-        # --- TOKEN COUNTING: Estimate tokens for this request ---
+        # Token Check
         estimated_tokens = token_counter.estimate_messages_tokens(messages)
-        
-        # Check if user has enough tokens left
         can_process, token_msg = token_counter.can_process(user_id, estimated_tokens)
         if not can_process:
             raise HTTPException(status_code=429, detail=token_msg)
-        
+
+        # --- FAST ANALYSIS ---
         reply_analysis = reply_time_analysis(messages)
-        toxicity_data = detect_toxicity(messages)
+        # Skip Toxicity: just return empty placeholder
+        toxicity_data = {"toxicity_rate": 0.0, "toxic_messages": [], "status": "locked"} 
+        
         sentiment_data = analyze_sentiment(messages)
         timeline = sentiment_timeline(sentiment_data)
         initiations = initiation_analysis(messages, gap_hours=6)
-        semantic_data = analyze_semantics(messages, toxicity_data=toxicity_data)
+        semantic_data = analyze_semantics(messages, toxicity_data=toxicity_data) # Might be weak without toxic info
         
         features = calculate_features(messages, reply_analysis, sentiment_data, initiations, toxicity_data)
         health_score = compute_health_score(features)
         persona = classifier.predict(features)
-        
-        coach_narrative = generate_relationship_narrative({
-            "participants": list(set(msg.sender for msg in messages)),
-            "health_score": health_score,
-            "initiations": initiations,
-            "features": features
-        })
+
+        # Placeholders for deep analysis
+        coach_narrative = "Locked. Click 'Unlock Deep Insights' to generate."
+        trend_results = {"decision": "Locked", "status": "locked"}
+        decision_advice = {"advice": [], "reply_suggestions": []}
 
         # --- RECORD USAGE ---
-        rate_limiter.record_request(user_id)
+        # rate_limiter.record_request(user_id)
         token_counter.record_tokens(user_id, estimated_tokens)
         
-        # Get updated usage stats
         rate_usage = rate_limiter.get_usage(user_id)
         token_usage = token_counter.get_today_usage(user_id)
 
-        # --- CORRECTED SUPABASE LOGIC ---
+        # DB operations
+        db_uuid = get_db_user_uuid(user_id)
         
-        # 1. Check if user exists
-        user_query = supabase.table("users").select("id").eq("clerk_id", user_id).execute()
-        
-        if not user_query.data:
-            # 2. Insert new user and get the returned UUID (id)
-            new_user = supabase.table("users").insert({"clerk_id": user_id}).execute()
-            db_uuid = new_user.data[0]["id"]
-        else:
-            # 2. Get the existing UUID
-            db_uuid = user_query.data[0]["id"]
-        
-        # 3. Insert analysis using the UUID, NOT the Clerk string
         full_data = {
             "total_messages": len(messages),
             "participants": list(set(msg.sender for msg in messages)),
@@ -172,13 +173,16 @@ async def complete_analysis(file: UploadFile = File(...), user_id: str = Depends
             "initiations": initiations,
             "semantic_analysis": semantic_data,
             "coach_summary": coach_narrative,
+            "trend_analysis": trend_results,
+            "decision_advice": decision_advice,
             "usage_stats": {
                 "rate_limiting": rate_usage,
                 "token_counting": token_usage
-            }
+            },
+            "analysis_status": "pending_deep"
         }
         
-        supabase.table("analyses").insert({
+        insert_resp = supabase.table("analyses").insert({
             "user_id": db_uuid,
             "total_messages": len(messages),
             "health_score": health_score,
@@ -186,29 +190,120 @@ async def complete_analysis(file: UploadFile = File(...), user_id: str = Depends
             "full_data": full_data
         }).execute()
         
+        analysis_id = insert_resp.data[0]["id"]
+        
+        # --- CACHE MESSAGES ---
+        cache_key = str(uuid.uuid4())
+        message_cache[cache_key] = messages
+        
+        full_data["cache_key"] = cache_key
+        full_data["analysis_id"] = analysis_id
+        
         return full_data
+
     except Exception as e:
-        print(f"Error Detail: {str(e)}") # This will show in your terminal
-        raise HTTPException(status_code=500, detail="Database or Analysis Error")
-    
+        print(f"Fast Analysis Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Fast Analysis Failed")
+
+@app.post("/analyze/deep")
+async def analyze_deep(request: DeepAnalysisRequest, user_id: str = Depends(verify_token)):
+    try:
+        messages = message_cache.get(request.cache_key)
+        if not messages:
+            raise HTTPException(status_code=400, detail="Session expired. Please re-upload the file.")
+            
+        # --- DEEP ANALYSIS ---
+        toxicity_data = detect_toxicity(messages) # Slow HP request
+        
+        # Need to reconstruct some features with real toxicity
+        # We need features to run coach/trend correctly if they depend on toxicity
+        # Re-fetch fast data? Or just recalculate needed parts.
+        # Let's recalculate features.
+        
+        # ... We need existing data from DB to merge? Or just recalculate features. 
+        # Easier to just run the specialized functions.
+        
+        reply_analysis = reply_time_analysis(messages) # Fast enough to re-run
+        sentiment_data = analyze_sentiment(messages)   # Fast enough
+        initiations = initiation_analysis(messages, gap_hours=6)
+        
+        features = calculate_features(messages, reply_analysis, sentiment_data, initiations, toxicity_data)
+        health_score = compute_health_score(features) # Might change due to toxicity
+        
+        # Trends
+        db_uuid = get_db_user_uuid(user_id)
+        history_query = supabase.table("analyses") \
+            .select("id, total_messages, health_score, full_data, created_at") \
+            .eq("user_id", db_uuid) \
+            .neq("id", request.analysis_id) .order("created_at", desc=True) \
+            .limit(5) \
+            .execute()
+            
+        past_history = history_query.data if history_query.data else []
+        
+        trend_results = evaluate_trends(
+            current_stats={
+                "health_score": health_score, 
+                "toxicity": toxicity_data, 
+                "features": features
+            },
+            history=past_history
+        )
+        
+        coach_narrative = generate_relationship_narrative({
+            "participants": list(set(msg.sender for msg in messages)),
+            "health_score": health_score,
+            "initiations": initiations,
+            "features": features
+        })
+        
+        decision_advice = generate_decision_advice(trend_results)
+        
+        # --- UPDATE DB ---
+        update_payload = {
+            "toxicity": toxicity_data,
+            "health_score": health_score,
+            "features": features,
+            "trend_analysis": trend_results,
+            "coach_summary": coach_narrative,
+            "decision_advice": decision_advice,
+            "analysis_status": "complete"
+        }
+        
+        # Fetch current record to merge deep fields... or simple merge in frontend?
+        # Ideally we update the JSON in DB. Supabase handles JSON updates but replacing the whole object is safer/easier here.
+        # We need the full object.
+        
+        # Let's get the current record
+        curr_rec = supabase.table("analyses").select("full_data").eq("id", request.analysis_id).execute()
+        if not curr_rec.data:
+             raise HTTPException(status_code=404, detail="Analysis not found")
+             
+        full_data = curr_rec.data[0]["full_data"]
+        full_data.update(update_payload)
+        
+        supabase.table("analyses").update({
+            "health_score": health_score,
+            "full_data": full_data
+        }).eq("id", request.analysis_id).execute()
+        
+        return full_data
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Deep Analysis Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Deep Analysis Failed: {str(e)}")
+
 @app.get("/history")
 async def get_analysis_history(user_id: str = Depends(verify_token)):
     try:
-        # 1. Get the internal UUID for this clerk_id
-        user_query = supabase.table("users").select("id").eq("clerk_id", user_id).execute()
-        
-        if not user_query.data:
-            return [] # New user, no history yet
-
-        db_uuid = user_query.data[0]["id"]
-
-        # 2. Fetch all analyses for this UUID, sorted by newest first
+        db_uuid = get_db_user_uuid(user_id)
         history = supabase.table("analyses") \
             .select("id, total_messages, health_score, persona_tag, created_at, full_data") \
             .eq("user_id", db_uuid) \
             .order("created_at", desc=True) \
             .execute()
-
         return history.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
