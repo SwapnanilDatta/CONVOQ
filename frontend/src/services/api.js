@@ -42,15 +42,3 @@ export const getHistory = async (token) => {
   if (!response.ok) throw new Error('Failed to fetch history');
   return response.json();
 };
-
-export const getUsageStats = async (token) => {
-  const response = await fetch(`${API_BASE_URL}/usage`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) throw new Error('Failed to fetch usage stats');
-  return response.json();
-};

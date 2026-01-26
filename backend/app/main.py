@@ -21,8 +21,7 @@ from app.services.cluster import ConversationClassifier
 from app.services.coach import generate_relationship_narrative, generate_decision_advice
 from app.services.semantic import analyze_semantics
 from app.services.trend_analysis import evaluate_trends
-from app.utils.rate_limiter import RateLimiter
-from app.utils.token_counter import TokenCounter
+
 
 load_dotenv()
 
@@ -37,9 +36,6 @@ security = HTTPBearer()
 # Cache for storing parsed messages. ID -> Message List. TTL=600s (10 min)
 message_cache = TTLCache(maxsize=100, ttl=600)
 
-# Initialize rate limiter and token counter
-rate_limiter = RateLimiter(requests_per_minute=3, requests_per_day=50)
-token_counter = TokenCounter(daily_token_limit=10000)
 
 app = FastAPI(title="CONVOQ API")
 
@@ -125,12 +121,6 @@ async def analyze_fast(file: UploadFile = File(...), user_id: str = Depends(veri
         
         if not messages:
             raise HTTPException(status_code=400, detail="No messages found")
-        
-        # Token Check
-        estimated_tokens = token_counter.estimate_messages_tokens(messages)
-        can_process, token_msg = token_counter.can_process(user_id, estimated_tokens)
-        if not can_process:
-            raise HTTPException(status_code=429, detail=token_msg)
 
         # --- FAST ANALYSIS ---
         reply_analysis = reply_time_analysis(messages)
@@ -151,13 +141,7 @@ async def analyze_fast(file: UploadFile = File(...), user_id: str = Depends(veri
         trend_results = {"decision": "Locked", "status": "locked"}
         decision_advice = {"advice": [], "reply_suggestions": []}
 
-        # --- RECORD USAGE ---
-        # rate_limiter.record_request(user_id)
-        token_counter.record_tokens(user_id, estimated_tokens)
-        
-        rate_usage = rate_limiter.get_usage(user_id)
-        token_usage = token_counter.get_today_usage(user_id)
-
+    
         # DB operations
         db_uuid = get_db_user_uuid(user_id)
         
@@ -175,10 +159,7 @@ async def analyze_fast(file: UploadFile = File(...), user_id: str = Depends(veri
             "coach_summary": coach_narrative,
             "trend_analysis": trend_results,
             "decision_advice": decision_advice,
-            "usage_stats": {
-                "rate_limiting": rate_usage,
-                "token_counting": token_usage
-            },
+            
             "analysis_status": "pending_deep"
         }
         
@@ -308,34 +289,6 @@ async def get_analysis_history(user_id: str = Depends(verify_token)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
 
-@app.get("/usage")
-async def get_usage_stats(user_id: str = Depends(verify_token)):
-    """Get current rate limit and token usage stats for authenticated user."""
-    try:
-        rate_usage = rate_limiter.get_usage(user_id)
-        token_usage = token_counter.get_today_usage(user_id)
-        
-        return {
-            "user_id": user_id,
-            "rate_limiting": {
-                "requests_this_minute": rate_usage["requests_this_minute"],
-                "requests_today": rate_usage["requests_today"],
-                "minute_limit": rate_usage["minute_limit"],
-                "daily_limit": rate_usage["daily_limit"],
-                "remaining_requests_today": rate_usage["remaining_today"],
-                "status": "⚠️ Limited" if rate_usage["requests_this_minute"] >= rate_usage["minute_limit"] else "✅ OK"
-            },
-            "token_counting": {
-                "tokens_used_today": token_usage["tokens_used_today"],
-                "tokens_remaining": token_usage["remaining_tokens"],
-                "daily_limit": token_usage["daily_limit"],
-                "usage_percentage": token_usage["percentage_used"],
-                "status": "⚠️ Critical" if token_usage["percentage_used"] > 85 else ("⚠️ Warning" if token_usage["percentage_used"] > 70 else "✅ OK")
-            }
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch usage: {str(e)}")
-    
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
