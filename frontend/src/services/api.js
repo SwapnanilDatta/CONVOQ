@@ -2,9 +2,10 @@ import { API_BASE_URL } from '../utils/constants';
 import axios from 'axios';
 
 // Fast Analysis
-export const getCompleteAnalysis = async (file, token) => {
+export const getCompleteAnalysis = async (file, token, dateFormat = 'auto') => {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('date_format', dateFormat);
 
   const response = await axios.post(`${API_BASE_URL}/analyze/fast`, formData, {
     headers: {

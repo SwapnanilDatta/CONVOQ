@@ -6,6 +6,7 @@ from app.models.schema import Message
 def parse_timestamp(timestamp: str) -> datetime:
     """Parse timestamp with multiple format support"""
     formats = [
+        "%Y-%m-%d %H:%M:%S", # ISO 8601 (Parsed Standard)
         "%m/%d/%y %I:%M %p",
         "%d/%m/%y %I:%M %p",
         "%m/%d/%Y %I:%M %p",

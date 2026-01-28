@@ -4,6 +4,7 @@ import { Upload, FileText, CheckCircle } from 'lucide-react';
 const FileUpload = ({ onFileSelect, isLoading }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [fileName, setFileName] = useState('');
+  const [dateFormat, setDateFormat] = useState('auto');
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -20,7 +21,7 @@ const FileUpload = ({ onFileSelect, isLoading }) => {
     const file = e.dataTransfer.files[0];
     if (file && file.type === 'text/plain') {
       setFileName(file.name);
-      onFileSelect(file);
+      onFileSelect(file, dateFormat);
     }
   };
 
@@ -28,7 +29,7 @@ const FileUpload = ({ onFileSelect, isLoading }) => {
     const file = e.target.files[0];
     if (file) {
       setFileName(file.name);
-      onFileSelect(file);
+      onFileSelect(file, dateFormat);
     }
   };
 
@@ -42,10 +43,24 @@ const FileUpload = ({ onFileSelect, isLoading }) => {
             ${isDragging ? 'border-purple-500 bg-slate-800' : 'border-slate-700 bg-slate-900'}
             ${isLoading ? 'opacity-50 pointer-events-none' : ''}
          `}
-        onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
+        {/* Date Format Select */}
+        <div className="absolute top-4 right-4 z-20">
+          <select
+            value={dateFormat}
+            onChange={(e) => setDateFormat(e.target.value)}
+            className="bg-slate-800 text-xs text-slate-300 border border-slate-700 rounded-lg px-2 py-1 focus:ring-1 focus:ring-purple-500 outline-none cursor-pointer hover:bg-slate-700 transition-colors"
+            disabled={isLoading}
+          >
+            <option value="auto">Auto Detect</option>
+            <option value="mm/dd/yyyy">MM/DD/YYYY (12/31/2024)</option>
+            <option value="dd/mm/yyyy">DD/MM/YYYY (31/12/2024)</option>
+            <option value="mm/dd/yy">MM/DD/YY (12/31/24)</option>
+            <option value="dd/mm/yy">DD/MM/YY (31/12/24)</option>
+          </select>
+        </div>
         <div className={`w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mb-4 transition-transform duration-300 ${isDragging ? 'scale-110' : ''}`}>
           {fileName ? <CheckCircle className="text-green-500" size={32} /> : <Upload className="text-purple-400" size={32} />}
         </div>

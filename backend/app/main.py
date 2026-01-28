@@ -4,7 +4,7 @@ from typing import List
 from collections import defaultdict
 from dotenv import load_dotenv
 from jose import jwt
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Body
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Body, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import create_client, Client
@@ -108,7 +108,7 @@ def get_db_user_uuid(clerk_id: str) -> str:
     return user_query.data[0]["id"]
 
 @app.post("/analyze/fast")
-async def analyze_fast(file: UploadFile = File(...), user_id: str = Depends(verify_token)):
+async def analyze_fast(file: UploadFile = File(...), date_format: str = Form("auto"), user_id: str = Depends(verify_token)):
     try:
         # Rate Limit
         # Rate Limit
@@ -117,7 +117,7 @@ async def analyze_fast(file: UploadFile = File(...), user_id: str = Depends(veri
         #     raise HTTPException(status_code=429, detail=rate_msg)
         
         content = await file.read()
-        messages = parse_chat(content.decode("utf-8"))
+        messages = parse_chat(content.decode("utf-8"), date_format=date_format)
         
         if not messages:
             raise HTTPException(status_code=400, detail="No messages found")

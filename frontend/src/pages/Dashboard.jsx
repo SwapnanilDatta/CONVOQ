@@ -51,12 +51,12 @@ const Dashboard = () => {
         if (user) loadHistory();
     }, [user]);
 
-    const handleFileUpload = async (file) => {
+    const handleFileUpload = async (file, dateFormat) => {
         setIsLoading(true);
         setError(null);
         try {
             const token = await getToken();
-            const data = await getCompleteAnalysis(file, token);
+            const data = await getCompleteAnalysis(file, token, dateFormat);
             if (data.cache_key) {
                 setAnalysisKeys({ cacheKey: data.cache_key, analysisId: data.analysis_id });
             }
