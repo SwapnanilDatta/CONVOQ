@@ -46,9 +46,8 @@ def reply_time_analysis(messages: List[Message]):
                     "from": prev_msg.sender,
                     "to": current_msg.sender
                 }
-                all_gaps.append(gap_data)
-                
                 if current_msg.sender != prev_msg.sender:
+                    all_gaps.append(gap_data)
                     reply_times[current_msg.sender].append(gap_data)
         except:
             continue

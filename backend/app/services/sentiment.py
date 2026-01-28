@@ -19,22 +19,15 @@ def analyze_sentiment(messages):
     return sentiment_data
 
 
+from app.services.analysis import parse_timestamp
+
 def sentiment_timeline(sentiment_data):
     daily = defaultdict(list)
 
     for item in sentiment_data:
         try:
             timestamp = item["timestamp"]
-            date_str = timestamp.split(" ")[0]
-            
-            # Try both MM/DD/YY and DD/MM/YY formats
-            date = None
-            for fmt in ["%m/%d/%y", "%d/%m/%y"]:
-                try:
-                    date = datetime.strptime(date_str, fmt).date()
-                    break
-                except ValueError:
-                    continue
+            date = parse_timestamp(timestamp).date()
             
             if date:
                 daily[date].append(item["sentiment"])

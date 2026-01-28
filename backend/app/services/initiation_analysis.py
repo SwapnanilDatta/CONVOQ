@@ -1,15 +1,17 @@
 from datetime import datetime
 from collections import defaultdict
+from app.services.analysis import parse_timestamp
+
 def initiation_analysis(messages, gap_hours=6):
     initiations = defaultdict(int)
 
     prev_time = None
 
     for i, msg in enumerate(messages):
-        current_time = datetime.strptime(
-            msg.timestamp.replace("pm", "PM").replace("am", "AM"),
-            "%m/%d/%y %I:%M %p"
-        )
+        try:
+            current_time = parse_timestamp(msg.timestamp)
+        except ValueError:
+            continue
 
         # First message always initiates
         if i == 0:
