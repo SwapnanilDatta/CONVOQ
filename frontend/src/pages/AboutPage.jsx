@@ -24,9 +24,9 @@ const AboutPage = () => {
                         Full Stack Developer & AI Enthusiast. Building things that make sense of the chaos.
                     </p>
                     <div className="flex gap-4">
-                        <SocialLink href="https://github.com" icon={<Github size={20} />} label="GitHub" />
-                        <SocialLink href="https://twitter.com" icon={<Twitter size={20} />} label="Twitter" />
-                        <SocialLink href="mailto:hello@example.com" icon={<Mail size={20} />} label="Email" />
+                        <SocialLink href="https://github.com/SwapnanilDatta" icon={<Github size={20} />} label="GitHub" />
+                        <SocialLink href="https://twitter.com/SwapnanilDatta" icon={<Twitter size={20} />} label="Twitter" />
+                        <SocialLink href="mailto:dattaswapnanil@gmail.com" icon={<Mail size={20} />} label="Email" />
                     </div>
                 </div>
 
