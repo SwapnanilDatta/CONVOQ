@@ -67,7 +67,7 @@ def generate_relationship_narrative(metrics: dict) -> str:
         print(f"Groq API Error: {e}")
         return "Coach dipped due to an API issue. Check the logs."
 
-def generate_decision_advice(trend_data: dict) -> dict:
+def generate_decision_advice(trend_data: dict, recent_messages: list = None) -> dict:
     """
     Generates specific advice and reply suggestions based on the trend decision.
     """
@@ -93,11 +93,22 @@ def generate_decision_advice(trend_data: dict) -> dict:
 
     reasons = trend_data.get("reasons", [])
     
+    # Format recent messages for context
+    msg_context = ""
+    if recent_messages:
+        msg_context = "RECENT MESSAGES (Use only for tone/style matching, do not analyze content deeply):\n"
+        for msg in recent_messages:
+            sender = msg.get("sender", "Unknown")
+            text = msg.get("message", "")
+            msg_context += f"- {sender}: {text}\n"
+
     prompt = f"""
     The analysis system has output the following decision for a relationship chat history:
     
     DECISION: {decision}
     REASONS DETECTED: {', '.join(reasons)}
+    
+    {msg_context}
     
     TASK:
     1. Provide 3 specific, actionable bullet points of advice for the user.
@@ -111,14 +122,17 @@ def generate_decision_advice(trend_data: dict) -> dict:
     }}
     
     TONE:
-    Direct, helpful, and realistic. If the decision is "Pause/Reconsider", the texts should be firm boundary-setting. If "Continue", they should be engaging.
+    Direct, helpful, and realistic. 
+    Crucial: Mimic the user's chatting style (length, capitalization, vibe) from the RECENT MESSAGES for the 'reply_suggestions'.
+    If the decision is "Pause/Reconsider", the texts should be firm boundary-setting but still sound like the user.
+    If "Continue", they should be engaging and natural.
     """
     
     try:
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             temperature=0.7,
-            max_tokens=300,
+            max_tokens=400,
             response_format={"type": "json_object"},
             messages=[
                 {

@@ -238,7 +238,14 @@ async def analyze_deep(request: DeepAnalysisRequest, user_id: str = Depends(veri
             "features": features
         })
         
-        decision_advice = generate_decision_advice(trend_results)
+        # Extract recent messages for tone matching
+        recent_msgs_data = []
+        if messages:
+            # Take last 8 to ensure we get enough context
+            for m in messages[-8:]:
+                recent_msgs_data.append({"sender": m.sender, "message": m.message})
+
+        decision_advice = generate_decision_advice(trend_results, recent_messages=recent_msgs_data)
         
         # --- UPDATE DB ---
         update_payload = {

@@ -56,7 +56,7 @@ const LandingPage = () => {
                                 <Upload className="w-10 h-10 text-purple-400" />
                             </div>
                             <h3 className="text-2xl font-bold">Drag & Drop Chat Export</h3>
-                            <p className="text-slate-400 mt-2">WhatsApp or Instagram supported</p>
+                            <p className="text-slate-400 mt-2">WhatsApp exported .txt files supported</p>
                         </div>
                     </div>
                 </div>
