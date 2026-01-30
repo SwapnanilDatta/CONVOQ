@@ -92,7 +92,7 @@ const FileUpload = ({ onFileSelect, isLoading }) => {
       <div className="mt-6 text-center">
         <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-2">How to export from WhatsApp</p>
         <div className="inline-block bg-slate-900/50 rounded-lg px-4 py-3 border border-slate-800 text-slate-400 text-sm">
-          Open Chat &gt; Tap Name &gt; Export Chat &gt; <span className="text-purple-400 font-semibold">Without Media</span>
+          Open Chat &gt; Tap on three dots &gt; More &gt; Export Chat &gt; Extract Chat &gt; <span className="text-purple-400 font-semibold">Without Media</span>
         </div>
       </div>
     </div>
